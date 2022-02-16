@@ -1,0 +1,13 @@
+minio:
+  endpoint: http://10.189.66.197:9999
+  port: 9999
+  accessKey: minioAdmin
+  secretKey: minioAdmin
+  bucketName: "video1"
+
+spring:
+  # 配置文件上传大小限制
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 100MB
