@@ -1,36 +1,28 @@
 package com.minio.demo.utils;
 
+import io.minio.*;
+import io.minio.messages.Bucket;
+import io.minio.messages.Item;
+import org.springframework.stereotype.Component;
+import org.springframework.web.multipart.MultipartFile;
+
+import javax.annotation.Resource;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
+
+
 /**
  * @ClassName: MinioUtil
  * @Description: MinIO工具类
  * @author: Gatsby
  * @date: 2022/2/10 17:31
  */
-
-import io.minio.*;
-import io.minio.messages.Bucket;
-import io.minio.BucketExistsArgs;
-import io.minio.messages.Item;
-import org.apache.commons.io.IOUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Component;
-
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
 @Component
 public class MinioUtil {
-    @Autowired
+    @Resource
     private MinioClient minioClient;
 
     /**
@@ -160,7 +152,7 @@ public class MinioUtil {
     // 沿用WebRTC生成的文件名还是重新命名，这个url需要保存用以查询双录文件
 
     /**
-     * @MethodName: putObject
+     * @MethodName: uploadObject
      * @Parameter: [bucketName, objectName, filePath]
      * @Return boolean
      * @Description: Uploads contents from a file as object in bucket.
@@ -168,8 +160,7 @@ public class MinioUtil {
      * @author: Gatsby
      * @date: 2022/2/16 14:08
      */
-    public boolean putObject(String bucketName, String objectName, String filePath) {
-        // Upload a video file.
+    public boolean uploadObject(String bucketName, String objectName, String filePath) {
         try {
             minioClient.uploadObject(
                     UploadObjectArgs.builder()
@@ -187,6 +178,75 @@ public class MinioUtil {
     }
 
     /**
+     * @MethodName: putObject
+     * @Parameter: [bucketName, multipartFile]
+     * @Return java.util.List<java.lang.String>
+     * @Description:
+     * @author: Gatsby
+     * @date: 2022/2/21 18:52
+     */
+    public boolean putObject(String bucketName, String ObjectName, MultipartFile multipartFile) {
+        InputStream inputStream = null;
+        try {
+            inputStream = multipartFile.getInputStream();
+            minioClient.putObject(PutObjectArgs.builder()
+                    .bucket(bucketName)
+                    .object(ObjectName)
+                    .stream(inputStream, inputStream.available(), -1)
+                    .contentType(multipartFile.getContentType())
+                    .build());
+            return true;
+        } catch (Exception e) {
+            // TODO throws...
+            e.printStackTrace();
+            return false;
+        } finally {
+            if (inputStream != null) {
+                try {
+                    inputStream.close();
+                } catch (IOException e) {
+                    // TODO throws...
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+    /**
+     * @MethodName: putImageByBase64
+     * @Parameter: [bucketName, ObjectName, Base64]
+     * @Return boolean
+     * @Description: 通过发送Base64，转换成InputStream再上传MinIO文件服务器
+     * @author: Gatsby
+     * @date: 2022/2/21 19:14
+     */
+    public boolean putImageByBase64(String bucketName, String ObjectName, String base64) {
+        InputStream inputStream = Base64ToInputStreamUtil.base64ToInputStream(base64);
+        try {
+            minioClient.putObject(PutObjectArgs.builder()
+                    .bucket(bucketName)
+                    .object(ObjectName)
+                    .stream(inputStream, inputStream.available(), -1)
+                    .contentType("image/jpeg")
+                    .build());
+            return true;
+        } catch (Exception e) {
+            // TODO throws...
+            e.printStackTrace();
+            return false;
+        } finally {
+            if (inputStream != null) {
+                try {
+                    inputStream.close();
+                } catch (IOException e) {
+                    // TODO throws...
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+    /**
      * @MethodName: downloadObject
      * @Parameter: [bucketName, objectName, outputName]
      * @Return boolean
@@ -195,13 +255,21 @@ public class MinioUtil {
      * @author: Gatsby
      * @date: 2022/2/16 15:24
      */
-    public boolean downloadObject(String bucketName, String objectName, String outputName) {
+    public boolean downloadObject(String bucketName, String objectName) {
         try {
+            String outputPath = "src/main/resources/output/" + objectName;
+            System.out.println(outputPath);
+            File file = new File(outputPath);
+            if (file.createNewFile()) {
+                System.out.println("File created: " + file.getName());
+            } else {
+                System.out.println("File " + objectName + " has existed.");
+            }
             minioClient.downloadObject(
                     DownloadObjectArgs.builder()
                             .bucket(bucketName)
                             .object(objectName)
-                            .filename(outputName)
+                            .filename(outputPath)
                             .build());
             return true;
         } catch (Exception e) {
